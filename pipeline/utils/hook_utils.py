@@ -7,6 +7,9 @@ from typing import List, Tuple, Callable
 from jaxtyping import Float
 from torch import Tensor
 
+
+k = 0.3
+
 @contextlib.contextmanager
 def add_hooks(
     module_forward_pre_hooks: List[Tuple[torch.nn.Module, Callable]],
@@ -38,7 +41,7 @@ def add_hooks(
         for h in handles:
             h.remove()
 
-def get_direction_ablation_input_pre_hook_first_ten(direction: Tensor):
+def get_direction_ablation_input_pre_hook_first_k(direction: Tensor):
     def hook_fn(module, input):
         nonlocal direction
 
@@ -50,7 +53,7 @@ def get_direction_ablation_input_pre_hook_first_ten(direction: Tensor):
         # direction = direction / (direction.norm(dim=-1, keepdim=True) + 1e-8)
         # direction = direction.to(activation)
         # activation -= (activation @ direction).unsqueeze(-1) * direction 
-        activation[:, :, :math.floor(activation.shape[2]*0.1)] = 0
+        activation[:, :, :math.floor(activation.shape[2]*k)] = 0
 
         if isinstance(input, tuple):
             return (activation, *input[1:])
@@ -79,7 +82,7 @@ def get_direction_ablation_input_pre_hook(direction: Tensor):
 
 # Randomly make 10% of the activations zero
 import math
-def get_direction_ablation_output_hook_first_ten(direction: Tensor):
+def get_direction_ablation_output_hook_first_k(direction: Tensor):
     def hook_fn(module, input, output):
         nonlocal direction
 
@@ -91,7 +94,7 @@ def get_direction_ablation_output_hook_first_ten(direction: Tensor):
         # direction = direction / (direction.norm(dim=-1, keepdim=True) + 1e-8)
         # direction = direction.to(activation)
         # activation -= (activation @ direction).unsqueeze(-1) * direction 
-        activation[:, :, :math.floor(activation.shape[2]*0.1)] = 0
+        activation[:, :, :math.floor(activation.shape[2]*k)] = 0
 
         if isinstance(output, tuple):
             return (activation, *output[1:])
@@ -132,13 +135,13 @@ def get_all_direction_ablation_hooks(
     print(fwd_hooks)
     return fwd_pre_hooks, fwd_hooks
 
-def get_all_direction_ablation_hooks_first_ten(
+def get_all_direction_ablation_hooks_first_k(
     model_base,
     direction: Float[Tensor, 'd_model'],
 ):
-    fwd_pre_hooks = [(model_base.model_block_modules[layer], get_direction_ablation_input_pre_hook_first_ten(direction=direction)) for layer in range(model_base.model.config.num_hidden_layers)]
-    fwd_hooks = [(model_base.model_attn_modules[layer], get_direction_ablation_output_hook_first_ten(direction=direction)) for layer in range(model_base.model.config.num_hidden_layers)]
-    fwd_hooks += [(model_base.model_mlp_modules[layer], get_direction_ablation_output_hook_first_ten(direction=direction)) for layer in range(model_base.model.config.num_hidden_layers)]
+    fwd_pre_hooks = [(model_base.model_block_modules[layer], get_direction_ablation_input_pre_hook_first_k(direction=direction)) for layer in range(model_base.model.config.num_hidden_layers)]
+    fwd_hooks = [(model_base.model_attn_modules[layer], get_direction_ablation_output_hook_first_k(direction=direction)) for layer in range(model_base.model.config.num_hidden_layers)]
+    fwd_hooks += [(model_base.model_mlp_modules[layer], get_direction_ablation_output_hook_first_k(direction=direction)) for layer in range(model_base.model.config.num_hidden_layers)]
 
     print(fwd_pre_hooks)
     print(fwd_hooks)
@@ -164,7 +167,7 @@ def get_directional_patching_input_pre_hook(direction: Float[Tensor, "d_model"],
             return activation
     return hook_fn
 
-def get_activation_addition_input_pre_hook_first_ten(vector: Float[Tensor, "d_model"], coeff: Float[Tensor, ""]):
+def get_activation_addition_input_pre_hook_first_k(vector: Float[Tensor, "d_model"], coeff: Float[Tensor, ""]):
     def hook_fn(module, input):
         nonlocal vector
 
@@ -177,7 +180,7 @@ def get_activation_addition_input_pre_hook_first_ten(vector: Float[Tensor, "d_mo
         # activation += coeff * vector
 
 
-        activation[:, :, :math.floor(activation.shape[2]*0.1)] = 0
+        activation[:, :, :math.floor(activation.shape[2]*k)] = 0
 
         if isinstance(input, tuple):
             return (activation, *input[1:])
