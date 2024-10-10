@@ -8,7 +8,7 @@ from jaxtyping import Float
 from torch import Tensor
 
 
-k = 0.3
+k = 0.5
 
 @contextlib.contextmanager
 def add_hooks(
